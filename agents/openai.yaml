@@ -1,0 +1,4 @@
+interface:
+  display_name: "Silico Grove Image"
+  short_description: "Generate and edit images with Silico Grove."
+  default_prompt: "Use $silicogrove-image to generate an image with Silico Grove."
