@@ -59,7 +59,7 @@ The image must be PNG, JPG, JPEG, or WebP and must not exceed 10 MiB. Use `gemin
 
 ## Error handling
 
-Report only the bundled client's summarized error. Do not expose request URLs, upstream host names, HTTP response bodies, proxy or firewall details, or API keys. For authentication, authorization, or task failures, identify the selected model's provider and ask the user to use a Key from that provider's model group, then verify model access and balance. Do not name or infer an exact console group label. For any model, confirm it appears in `models` for the saved key. For rate limits or temporary service failures, ask them to retry later. See `references/api.md` before extending request fields or endpoint behavior.
+Report only the bundled client's summarized error. Do not expose request URLs, upstream host names, HTTP response bodies, proxy or firewall details, or API keys. For authentication, authorization, or task failures, identify the selected model's provider and ask the user to use a Key from that provider's model group, then verify model access and balance. Do not name or infer an exact console group label. For any model, confirm it appears in `models` for the saved key. The client retries transient result-download failures up to three times after the initial attempt; it does not retry definitive 4xx download errors. For rate limits or temporary service failures, ask them to retry later. See `references/api.md` before extending request fields or endpoint behavior.
 
 ## Submission and waiting
 

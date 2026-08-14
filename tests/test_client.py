@@ -111,6 +111,29 @@ class ClientTests(unittest.TestCase):
         self.assertNotIn("silicogrove.com", message)
         self.assertNotIn("502", message)
 
+    def test_download_retries_three_times_after_initial_network_failure(self):
+        response = MagicMock()
+        response.read.return_value = b"image"
+        response.headers.get_content_type.return_value = "image/png"
+        response.__enter__.return_value = response
+        with patch.object(
+            CLIENT_MODULE.urllib.request,
+            "urlopen",
+            side_effect=[urllib.error.URLError("unavailable")] * 3 + [response],
+        ) as urlopen, patch.object(CLIENT_MODULE.time, "sleep") as sleep:
+            raw, suffix = CLIENT_MODULE.download_url("https://example.com/result.png")
+        self.assertEqual(raw, b"image")
+        self.assertEqual(suffix, "png")
+        self.assertEqual(urlopen.call_count, 4)
+        self.assertEqual(sleep.call_count, 3)
+
+    def test_download_does_not_retry_definitive_http_error(self):
+        error = urllib.error.HTTPError("https://example.com/result.png", 404, "missing", {}, None)
+        with patch.object(CLIENT_MODULE.urllib.request, "urlopen", side_effect=error) as urlopen:
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                CLIENT_MODULE.download_url("https://example.com/result.png")
+        self.assertEqual(urlopen.call_count, 1)
+
     def test_output_image_count_uses_existing_local_results(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)

@@ -19,6 +19,7 @@ BASE_URLS = ("https://ai.silicogrove.com", "https://api.silicogrove.com")
 DEFAULT_TIMEOUT_SECONDS = 300
 POLL_INTERVAL_SECONDS = 3
 ESCALATED_WAIT_SECONDS = 120
+MAX_DOWNLOAD_RETRIES = 3
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
@@ -160,15 +161,21 @@ def download_url(url):
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in {"https", "http"} or not parsed.netloc:
         fail("Silico Grove returned an invalid image URL.")
-    try:
-        with urllib.request.urlopen(url, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
-            raw = response.read()
-            content_type = response.headers.get_content_type()
-    except (urllib.error.URLError, TimeoutError):
-        fail("Could not download the generated image. Please retry later.")
-    if not raw:
-        fail("Silico Grove returned an empty image file.")
-    return raw, image_extension(content_type)
+    for attempt in range(MAX_DOWNLOAD_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+                raw = response.read()
+                content_type = response.headers.get_content_type()
+            if not raw:
+                raise urllib.error.URLError("empty image")
+            return raw, image_extension(content_type)
+        except urllib.error.HTTPError as error:
+            if error.code < 500 or attempt == MAX_DOWNLOAD_RETRIES:
+                fail("Could not download the generated image. Please retry later.")
+        except (urllib.error.URLError, TimeoutError):
+            if attempt == MAX_DOWNLOAD_RETRIES:
+                fail("Could not download the generated image. Please retry later.")
+        time.sleep(attempt + 1)
 
 
 def save_results(response, output_dir):
