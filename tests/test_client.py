@@ -110,11 +110,27 @@ class ClientTests(unittest.TestCase):
             path = Path(directory) / "source.png"
             path.write_bytes(b"image")
             args = SimpleNamespace(action="edit", image=path, prompt="edit", model="gpt-image-2", size="1024x1024", quality="high", n=1, no_wait=True, output_dir=directory)
-            with patch.object(CLIENT_MODULE, "submit_task", return_value=("task_1", "https://ai.silicogrove.com")) as submit, contextlib.redirect_stdout(io.StringIO()):
+            stdout = io.StringIO()
+            with patch.object(CLIENT_MODULE, "submit_task", return_value=("task_1", "https://ai.silicogrove.com")) as submit, contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(io.StringIO()):
                 CLIENT_MODULE.run_image(args)
-        fields = submit.call_args.args[1]
-        self.assertEqual(fields["images"], [{"image_url": "data:image/png;base64,aW1hZ2U="}])
-        self.assertEqual(len(submit.call_args.args), 2)
+            fields = submit.call_args.args[1]
+            record = json.loads(CLIENT_MODULE.task_record_path(directory, "task_1").read_text())
+            self.assertEqual(fields["images"], [{"image_url": "data:image/png;base64,aW1hZ2U="}])
+            self.assertEqual(len(submit.call_args.args), 2)
+            self.assertEqual(stdout.getvalue().strip(), "task_1")
+            self.assertEqual(record["status"], "submitted")
+            self.assertEqual(record["action"], "edit")
+            self.assertEqual(record["model"], "gpt-image-2")
+
+    def test_task_record_updates_without_prompt_or_key(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = CLIENT_MODULE.write_task_record(directory, "task_1", action="generate", model="gpt-image-2", status="submitted")
+            CLIENT_MODULE.write_task_record(directory, "task_1", status="completed", result_paths=["/tmp/result.png"])
+            record = json.loads(path.read_text())
+        self.assertEqual(record["status"], "completed")
+        self.assertEqual(record["result_paths"], ["/tmp/result.png"])
+        self.assertNotIn("prompt", record)
+        self.assertNotIn("api_key", record)
 
     def test_oversized_image_is_rejected_before_upload(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -187,7 +203,7 @@ class ClientTests(unittest.TestCase):
                 ({"id": "task_1", "status": "processing"}, "https://ai.silicogrove.com"),
                 ({"id": "task_1", "status": "completed", "data": [{"url": "https://example.com/result.png"}]}, "https://ai.silicogrove.com"),
             ]
-            with patch.object(CLIENT_MODULE, "json_request", side_effect=responses) as request, patch.object(CLIENT_MODULE, "save_results") as save, patch.object(CLIENT_MODULE.time, "monotonic", side_effect=[0, 121]), patch.object(CLIENT_MODULE.time, "sleep"), contextlib.redirect_stderr(io.StringIO()) as stderr:
+            with patch.object(CLIENT_MODULE, "json_request", side_effect=responses) as request, patch.object(CLIENT_MODULE, "save_results", return_value=[]) as save, patch.object(CLIENT_MODULE.time, "monotonic", side_effect=[0, 121]), patch.object(CLIENT_MODULE.time, "sleep"), contextlib.redirect_stderr(io.StringIO()) as stderr:
                 CLIENT_MODULE.wait_for_task("task_1", output, "https://ai.silicogrove.com")
             self.assertEqual(request.call_count, 2)
             save.assert_called_once_with(responses[1][0], output)

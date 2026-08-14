@@ -63,7 +63,7 @@ Report only the bundled client's summarized error. Do not expose request URLs, u
 
 ## Submission and waiting
 
-Track every accepted task ID. Do not invoke `generate` or `edit` again while a submission is unresolved; task polling requests may retry because they do not create work. After a command exits, check its exit status and confirm that the printed output paths exist. If a duplicate request was submitted accidentally, query every known task ID and deliver the local images from every completed task; explain that all completed requests were returned.
+Track every accepted task ID. The client prints the ID immediately and writes one task record at `OUTPUT_DIR/.silicogrove-tasks/TASK_ID.json`. Records contain lifecycle metadata and completed local image paths, never API Keys or prompts. Do not invoke `generate` or `edit` again while a submission is unresolved; task polling requests may retry because they do not create work. After a command exits, check its exit status and confirm that the printed output paths exist. If a duplicate request was submitted accidentally, query every known task ID and deliver the local images from every completed task; explain that all completed requests were returned.
 
 For an explicit request to generate multiple times, submit the requested number of separate tasks, track every task ID, and deliver every completed task's images. Do not collapse them into one result.
 

@@ -198,6 +198,7 @@ def save_results(response, output_dir):
     directory = Path(output_dir).expanduser().resolve()
     directory.mkdir(parents=True, exist_ok=True)
     timestamp = time.strftime("%Y%m%d-%H%M%S")
+    paths = []
     for index, item in enumerate(entries, 1):
         if not isinstance(item, dict):
             fail("Silico Grove returned invalid image data.")
@@ -218,6 +219,8 @@ def save_results(response, output_dir):
         if dimensions:
             message += f" ({dimensions[0]}x{dimensions[1]})"
         print(message)
+        paths.append(str(path))
+    return paths
 
 
 def output_image_count(output_dir):
@@ -225,6 +228,40 @@ def output_image_count(output_dir):
     if not directory.is_dir():
         return 0
     return sum(path.is_file() and path.name.startswith("silicogrove-") for path in directory.iterdir())
+
+
+def task_record_path(output_dir, task_id):
+    filename = urllib.parse.quote(task_id, safe="._-") + ".json"
+    return Path(output_dir).expanduser().resolve() / ".silicogrove-tasks" / filename
+
+
+def write_task_record(output_dir, task_id, **updates):
+    path = task_record_path(output_dir, task_id)
+    try:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        private_mode(path.parent, 0o700)
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            record = {"task_id": task_id}
+        if not isinstance(record, dict):
+            record = {"task_id": task_id}
+        record.update(updates)
+        record["updated_at"] = int(time.time())
+        temporary = path.parent / f".{path.name}.{secrets.token_hex(8)}.tmp"
+        try:
+            with open(temporary, "w", encoding="utf-8") as handle:
+                private_mode(temporary, 0o600)
+                json.dump(record, handle, sort_keys=True)
+                handle.write("\n")
+            os.replace(temporary, path)
+            private_mode(path, 0o600)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+        return path
+    except (OSError, TypeError):
+        return None
 
 
 def list_models():
@@ -268,13 +305,19 @@ def wait_for_task(task_id, output_dir, base_url):
     endpoint = f"/v1/images/tasks/{urllib.parse.quote(task_id, safe='')}"
     started_at = time.monotonic()
     escalated = False
+    recorded_status = None
     while True:
         response, used_base = json_request("GET", endpoint, base_url=base_url)
         status = task_status(response)
+        if status != recorded_status:
+            write_task_record(output_dir, task_id, status=status)
+            recorded_status = status
         if status == "completed":
-            save_results(response, output_dir)
+            result_paths = save_results(response, output_dir)
+            write_task_record(output_dir, task_id, status="completed", result_paths=result_paths)
             return
         if status == "failed":
+            write_task_record(output_dir, task_id, status="failed")
             fail("Silico Grove image generation did not complete. Check the prompt, model access, and balance, then retry.")
         if status not in {"queued", "processing"}:
             fail("Silico Grove returned an invalid image task status. Please retry later.")
@@ -304,8 +347,20 @@ def run_image(args):
         image = validate_image(args.image)
         fields["images"] = [{"image_url": image_data_url(image)}]
         task_id, used_base = submit_task(args, fields)
+    print(task_id)
+    record_path = write_task_record(
+        args.output_dir,
+        task_id,
+        action=args.action,
+        model=args.model,
+        status="submitted",
+        submitted_at=int(time.time()),
+    )
+    if record_path:
+        print(f"Task record: {record_path}", file=sys.stderr)
+    else:
+        print("Warning: task record could not be written. Keep the printed task ID to resume later.", file=sys.stderr)
     if args.no_wait:
-        print(task_id)
         return
     wait_for_task(task_id, args.output_dir, used_base)
 

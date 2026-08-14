@@ -6,6 +6,7 @@
 - Submit edits: `POST /v1/images/tasks` with `images: [{ "image_url": "data:image/...;base64,..." }]`. The platform documents multipart or JSON; the bundled client uses this JSON form because multipart task requests may reject otherwise valid form fields.
 - Task submission returns HTTP 202 and `{ "id": "task_...", "status": "queued" }`. Query with `GET /v1/images/tasks/{task_id}` every 2-5 seconds. Statuses are `queued`, `processing`, `completed`, and `failed`.
 - Task creation is not safely retryable when the response is lost, because the task may have been accepted. Task-status requests are read-only and can be retried. Continue normal polling through 120 seconds; then check the task status and local output directory before continuing.
+- The bundled client writes one local task record per accepted task in `OUTPUT_DIR/.silicogrove-tasks/`, allowing `status TASK_ID` to resume polling after an interrupted process.
 - A completed task contains OpenAI-style `{ "data": [{ "url": "..." }] }` results that have been persisted by Silico Grove. Image URLs should be downloaded promptly with the same `Authorization: Bearer` API Key used for the task; some result URLs return `403` without it.
 - The client retries transient result-download failures up to three times after the initial download attempt. It does not retry definitive 4xx download errors.
 - List models with `GET /v1/models`; model availability depends on the API key and group.
