@@ -46,15 +46,15 @@ class ClientTests(unittest.TestCase):
 
     def test_prefers_ai_endpoint(self):
         with patch.object(CLIENT_MODULE.urllib.request, "urlopen", return_value=self.response({"data": []})) as urlopen:
-            response, base = CLIENT_MODULE.json_request("POST", "/v1/images/generations", {"model": "m"})
+            response, base = CLIENT_MODULE.json_request("GET", "/v1/models")
         self.assertEqual(response["data"], [])
         self.assertEqual(base, "https://ai.silicogrove.com")
         self.assertEqual(urlopen.call_count, 1)
 
     def test_falls_back_after_404(self):
-        error = urllib.error.HTTPError("https://ai.silicogrove.com/v1/images/generations", 404, "missing", {}, None)
+        error = urllib.error.HTTPError("https://ai.silicogrove.com/v1/models", 404, "missing", {}, None)
         with patch.object(CLIENT_MODULE.urllib.request, "urlopen", side_effect=[error, self.response({"data": []})]) as urlopen:
-            _, base = CLIENT_MODULE.json_request("POST", "/v1/images/generations", {"model": "m"})
+            _, base = CLIENT_MODULE.json_request("GET", "/v1/models")
         self.assertEqual(base, "https://api.silicogrove.com")
         self.assertEqual(urlopen.call_count, 2)
 
@@ -81,10 +81,10 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(CLIENT_MODULE.task_status(response), "processing")
 
     def test_does_not_fallback_after_server_error(self):
-        error = urllib.error.HTTPError("https://ai.silicogrove.com/v1/images/generations", 503, "unavailable", {}, None)
+        error = urllib.error.HTTPError("https://ai.silicogrove.com/v1/models", 503, "unavailable", {}, None)
         with patch.object(CLIENT_MODULE.urllib.request, "urlopen", side_effect=error) as urlopen:
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                CLIENT_MODULE.json_request("POST", "/v1/images/generations", {"model": "m"})
+                CLIENT_MODULE.json_request("GET", "/v1/models")
         self.assertEqual(urlopen.call_count, 1)
 
     def test_png_dimensions(self):
@@ -110,6 +110,28 @@ class ClientTests(unittest.TestCase):
         self.assertEqual(message, "Silico Grove image service is temporarily unavailable. Please retry later.")
         self.assertNotIn("silicogrove.com", message)
         self.assertNotIn("502", message)
+
+    def test_output_image_count_uses_existing_local_results(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            (output / "silicogrove-old.png").write_bytes(b"image")
+            (output / "other.png").write_bytes(b"image")
+            self.assertEqual(CLIENT_MODULE.output_image_count(output), 1)
+
+    def test_long_wait_checks_status_and_output_without_resubmitting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            (output / "silicogrove-old.png").write_bytes(b"image")
+            responses = [
+                ({"id": "task_1", "status": "processing"}, "https://ai.silicogrove.com"),
+                ({"id": "task_1", "status": "completed", "data": [{"url": "https://example.com/result.png"}]}, "https://ai.silicogrove.com"),
+            ]
+            with patch.object(CLIENT_MODULE, "json_request", side_effect=responses) as request, patch.object(CLIENT_MODULE, "save_results") as save, patch.object(CLIENT_MODULE.time, "monotonic", side_effect=[0, 121]), patch.object(CLIENT_MODULE.time, "sleep"), contextlib.redirect_stderr(io.StringIO()) as stderr:
+                CLIENT_MODULE.wait_for_task("task_1", output, "https://ai.silicogrove.com")
+            self.assertEqual(request.call_count, 2)
+            save.assert_called_once_with(responses[1][0], output)
+            self.assertIn("Checked output directory", stderr.getvalue())
+            self.assertIn("Continuing without resubmitting", stderr.getvalue())
 
 
 if __name__ == "__main__":

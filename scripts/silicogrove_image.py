@@ -18,6 +18,7 @@ from pathlib import Path
 BASE_URLS = ("https://ai.silicogrove.com", "https://api.silicogrove.com")
 DEFAULT_TIMEOUT_SECONDS = 300
 POLL_INTERVAL_SECONDS = 3
+ESCALATED_WAIT_SECONDS = 120
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
@@ -199,6 +200,13 @@ def save_results(response, output_dir):
         print(message)
 
 
+def output_image_count(output_dir):
+    directory = Path(output_dir).expanduser().resolve()
+    if not directory.is_dir():
+        return 0
+    return sum(path.is_file() and path.name.startswith("silicogrove-") for path in directory.iterdir())
+
+
 def list_models():
     response, _ = json_request("GET", "/v1/models")
     models = response.get("data")
@@ -238,6 +246,8 @@ def submit_task(args, fields, body=None, content_type=None):
 
 def wait_for_task(task_id, output_dir, base_url):
     endpoint = f"/v1/images/tasks/{urllib.parse.quote(task_id, safe='')}"
+    started_at = time.monotonic()
+    escalated = False
     while True:
         response, used_base = json_request("GET", endpoint, base_url=base_url)
         status = task_status(response)
@@ -248,6 +258,15 @@ def wait_for_task(task_id, output_dir, base_url):
             fail("Silico Grove image generation did not complete. Check the prompt, model access, and balance, then retry.")
         if status not in {"queued", "processing"}:
             fail("Silico Grove returned an invalid image task status. Please retry later.")
+        elapsed = time.monotonic() - started_at
+        if elapsed >= ESCALATED_WAIT_SECONDS and not escalated:
+            print(
+                f"Image task {task_id} is still {status} after {int(elapsed)} seconds. "
+                f"Checked output directory: {Path(output_dir).expanduser().resolve()} "
+                f"({output_image_count(output_dir)} existing image file(s)). Continuing without resubmitting.",
+                file=sys.stderr,
+            )
+            escalated = True
         time.sleep(POLL_INTERVAL_SECONDS)
 
 

@@ -14,6 +14,8 @@ On first use, proactively ask me for a Silico Grove API Key and save it securely
 
 Use asynchronous image tasks and download completed images to my local output directory, not only as image links.
 
+Before every generate or edit request, silently check this Skill's upstream Git update when no update is available. If an update is available, explicitly tell me it may contain required fixes, then update a clean checkout before making the image request. If the check or update fails, or local changes block the update, tell me and do not make the request; never overwrite local changes.
+
 Choose an API Key from the group for the selected model's provider. Do not assume the console's group name follows a fixed naming convention. Confirm the selected model is available to the saved Key; if image generation fails, tell me to verify the provider's Key group, model access, and balance.
 
 Official documentation:
