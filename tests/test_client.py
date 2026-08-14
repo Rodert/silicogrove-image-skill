@@ -6,6 +6,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 import urllib.error
 
@@ -97,6 +98,23 @@ class ClientTests(unittest.TestCase):
             path.write_bytes(b"image")
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 CLIENT_MODULE.validate_image(path)
+
+    def test_image_data_url_encodes_local_image(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "source.png"
+            path.write_bytes(b"image")
+            self.assertEqual(CLIENT_MODULE.image_data_url(path), "data:image/png;base64,aW1hZ2U=")
+
+    def test_edit_submits_reference_as_json_data_url(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "source.png"
+            path.write_bytes(b"image")
+            args = SimpleNamespace(action="edit", image=path, prompt="edit", model="gpt-image-2", size="1024x1024", quality="high", n=1, no_wait=True, output_dir=directory)
+            with patch.object(CLIENT_MODULE, "submit_task", return_value=("task_1", "https://ai.silicogrove.com")) as submit, contextlib.redirect_stdout(io.StringIO()):
+                CLIENT_MODULE.run_image(args)
+        fields = submit.call_args.args[1]
+        self.assertEqual(fields["images"], [{"image_url": "data:image/png;base64,aW1hZ2U="}])
+        self.assertEqual(len(submit.call_args.args), 2)
 
     def test_oversized_image_is_rejected_before_upload(self):
         with tempfile.TemporaryDirectory() as directory:

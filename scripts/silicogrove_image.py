@@ -147,6 +147,12 @@ def validate_image(raw_path):
     return path
 
 
+def image_data_url(image_path):
+    path = Path(image_path)
+    mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+
 def image_extension(content_type):
     return {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}.get(content_type.split(";", 1)[0].lower(), "png")
 
@@ -296,8 +302,8 @@ def run_image(args):
         task_id, used_base = submit_task(args, fields)
     else:
         image = validate_image(args.image)
-        body, content_type = multipart(fields, image)
-        task_id, used_base = submit_task(args, fields, body, content_type)
+        fields["images"] = [{"image_url": image_data_url(image)}]
+        task_id, used_base = submit_task(args, fields)
     if args.no_wait:
         print(task_id)
         return

@@ -55,7 +55,7 @@ python3 "$SKILL_DIR/scripts/silicogrove_image.py" edit \
   --model gpt-image-2 --size 1024x1024 --quality high --output-dir ./outputs
 ```
 
-The image must be PNG, JPG, JPEG, or WebP and must not exceed 10 MiB. Use `gemini-3.1-flash-image` with `--quality 2k` for a Gemini image workflow when that model is available to the key. `--no-wait` and `status TASK_ID` work for asynchronous edits as well.
+The image must be PNG, JPG, JPEG, or WebP and must not exceed 10 MiB. The client submits a local reference image as `images: [{"image_url": "data:image/...;base64,..."}]` because the documented multipart task route may reject valid form fields. Use `gemini-3.1-flash-image` with `--quality 2k` for a Gemini image workflow when that model is available to the key. `--no-wait` and `status TASK_ID` work for asynchronous edits as well.
 
 ## Error handling
 
