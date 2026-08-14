@@ -161,9 +161,16 @@ def download_url(url):
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme not in {"https", "http"} or not parsed.netloc:
         fail("Silico Grove returned an invalid image URL.")
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {load_key()}",
+            "User-Agent": "SilicoGroveImageSkill/1.0 (portable local client)",
+        },
+    )
     for attempt in range(MAX_DOWNLOAD_RETRIES + 1):
         try:
-            with urllib.request.urlopen(url, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
+            with urllib.request.urlopen(request, timeout=DEFAULT_TIMEOUT_SECONDS) as response:
                 raw = response.read()
                 content_type = response.headers.get_content_type()
             if not raw:
@@ -188,7 +195,7 @@ def save_results(response, output_dir):
     for index, item in enumerate(entries, 1):
         if not isinstance(item, dict):
             fail("Silico Grove returned invalid image data.")
-        if isinstance(item.get("b64_json"), str):
+        if isinstance(item.get("b64_json"), str) and item["b64_json"]:
             try:
                 raw = base64.b64decode(item["b64_json"], validate=True)
             except (ValueError, TypeError):

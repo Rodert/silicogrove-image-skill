@@ -134,6 +134,26 @@ class ClientTests(unittest.TestCase):
                 CLIENT_MODULE.download_url("https://example.com/result.png")
         self.assertEqual(urlopen.call_count, 1)
 
+    def test_download_uses_saved_key_authorization(self):
+        response = MagicMock()
+        response.read.return_value = b"image"
+        response.headers.get_content_type.return_value = "image/png"
+        response.__enter__.return_value = response
+        with patch.object(CLIENT_MODULE.urllib.request, "urlopen", return_value=response) as urlopen:
+            CLIENT_MODULE.download_url("https://example.com/result.png")
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.get_header("Authorization"), "Bearer sk-test-value")
+
+    def test_empty_base64_uses_result_url(self):
+        response = {"data": [{"b64_json": "", "url": "https://example.com/result.png"}]}
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(CLIENT_MODULE, "download_url", return_value=(b"image", "png")) as download, contextlib.redirect_stdout(io.StringIO()):
+                CLIENT_MODULE.save_results(response, directory)
+            files = list(Path(directory).glob("silicogrove-*.png"))
+            self.assertEqual(len(files), 1)
+            self.assertEqual(files[0].read_bytes(), b"image")
+        download.assert_called_once_with("https://example.com/result.png")
+
     def test_output_image_count_uses_existing_local_results(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
