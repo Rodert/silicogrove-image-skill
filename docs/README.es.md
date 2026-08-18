@@ -14,7 +14,7 @@ En el primer uso, pídeme de forma proactiva una Silico Grove API Key y guárdal
 
 Usa tareas de imagen asíncronas y descarga las imágenes terminadas en mi directorio local de salida, no solo enlaces de imágenes.
 
-Antes de cada solicitud generate o edit, comprueba las actualizaciones Git remotas de este Skill. Si no hay actualización, continúa sin avisarme. Si hay una actualización, indícame explícitamente que puede contener correcciones necesarias y actualiza una copia local limpia antes de hacer la solicitud de imagen. Si falla la comprobación o la actualización, o los cambios locales la bloquean, avísame y no hagas la solicitud; no sobrescribas nunca los cambios locales.
+Antes de la primera solicitud generate o edit de cada día, comprueba las actualizaciones Git remotas de este Skill y omite la comprobación en las siguientes solicitudes del mismo día. Si no hay actualización, continúa sin avisarme. Si hay una actualización, avísame brevemente y actualiza una copia local limpia antes de hacer la solicitud de imagen. Si falla la comprobación o la actualización, o los cambios locales la bloquean, avísame y no hagas la solicitud; no sobrescribas nunca los cambios locales.
 
 Usa una API Key del grupo correspondiente al proveedor del modelo seleccionado. No supongas que el nombre del grupo en la consola es fijo; confirma que el modelo está disponible para la Key guardada. Si la generación falla, indícame que verifique el grupo de Key del proveedor, el acceso al modelo y el saldo.
 

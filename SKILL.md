@@ -11,22 +11,36 @@ The client creates an asynchronous task at `https://ai.silicogrove.com/v1/images
 
 ## Update check
 
-Before every `generate` or `edit`, check this Skill's Git remote for updates. When no update is available, continue silently. When `origin/main` is ahead, explicitly tell the user that a Skill update was found because it may contain required bug fixes or compatibility changes. When the working tree is clean, fast-forward to it and use the updated Skill before making an image request. If local modifications prevent the update, do not make the image request: repeatedly remind the user that the available update must be applied or the local changes resolved first. Do not overwrite local changes. If the Skill is not a Git checkout, has no `origin`, or the check or update fails, explicitly warn the user before the image request that update status could not be verified.
+Before the first `generate` or `edit` of each calendar day, check this Skill's Git remote for updates. Store the last successful check date in `${XDG_CONFIG_HOME:-$HOME/.config}/silicogrove-image/update-check-date`; when it already contains today's local date, skip the remote check and continue silently. When `origin/main` is ahead, briefly tell the user that a Skill update was found because it may contain required bug fixes or compatibility changes. When the working tree is clean, fast-forward to it and use the updated Skill before making an image request. If local modifications prevent the update, do not make the image request: tell the user once that the update is blocked and local changes must be resolved first. Do not overwrite local changes. If the Skill is not a Git checkout, has no `origin`, or the check or update fails, warn briefly before the image request that update status could not be verified and do not make the request. A normal up-to-date check must remain silent.
 
 ```bash
-if git -C "$SKILL_DIR" remote get-url origin >/dev/null 2>&1; then
-  git -C "$SKILL_DIR" fetch --quiet origin
-  if [ "$(git -C "$SKILL_DIR" rev-list --count HEAD..origin/main)" -gt 0 ]; then
-    if [ -z "$(git -C "$SKILL_DIR" status --porcelain)" ]; then
-      git -C "$SKILL_DIR" pull --ff-only origin main
-    fi
+UPDATE_STAMP="${XDG_CONFIG_HOME:-$HOME/.config}/silicogrove-image/update-check-date"
+TODAY="$(date +%Y-%m-%d)"
+if [ ! -r "$UPDATE_STAMP" ] || [ "$(cat "$UPDATE_STAMP" 2>/dev/null)" != "$TODAY" ]; then
+  if ! git -C "$SKILL_DIR" remote get-url origin >/dev/null 2>&1; then
+    echo "Silico Grove Image Skill update check unavailable; image request not started." >&2
+    exit 1
   fi
+  if ! git -C "$SKILL_DIR" fetch --quiet origin; then
+    echo "Silico Grove Image Skill update check failed; image request not started." >&2
+    exit 1
+  fi
+  if [ "$(git -C "$SKILL_DIR" rev-list --count HEAD..origin/main)" -gt 0 ]; then
+    if [ -n "$(git -C "$SKILL_DIR" status --porcelain)" ]; then
+      echo "Silico Grove Image Skill update is blocked by local changes; image request not started." >&2
+      exit 1
+    fi
+    echo "Silico Grove Image Skill update found; applying it before the image request." >&2
+    git -C "$SKILL_DIR" pull --ff-only origin main || exit 1
+  fi
+  mkdir -p "$(dirname "$UPDATE_STAMP")"
+  printf '%s\n' "$TODAY" > "$UPDATE_STAMP"
 fi
 ```
 
 ## Credential workflow
 
-1. Run `python3 "$SKILL_DIR/scripts/silicogrove_image.py" config --show-status`.
+1. Run `python3 "$SKILL_DIR/scripts/silicogrove_image.py" config --show-status` only on first use or when changing the selected model/provider; reuse the saved key for normal requests.
 2. If it prints `not configured`, ask for a key from the API Key group associated with the selected model's provider. `gpt-image-2` is an OpenAI/GPT model; `gemini-3.1-flash-image` is a Google/Gemini model. Do not assume a key issued for one provider's models can invoke another provider's models, and do not assume the console's group name follows a fixed naming convention.
 3. Keep the key out of prompts, project files, output, and terminal arguments.
 4. When the runtime supports interactive terminal input, run `config --set-key` and enter the key without echoing it.
@@ -36,7 +50,7 @@ The client stores the key in the current user's configuration directory: `~/.con
 
 ## Generate
 
-List models with `python3 "$SKILL_DIR/scripts/silicogrove_image.py" models`, then use an image model visible to the user's key. Defaults are `gpt-image-2`, `1024x1024`, and `high` quality. Use an API Key from the group associated with that model's provider: `gpt-image-2` is OpenAI/GPT, while `gemini-3.1-flash-image` is Google/Gemini and commonly uses `2k` quality. Check `references/api.md` before choosing a model-specific size or quality.
+Use the saved model directly; do not query the model list before every request. Run `python3 "$SKILL_DIR/scripts/silicogrove_image.py" models` only during initial setup, when switching models, or when the selected model is rejected. Defaults are `gpt-image-2`, `1024x1024`, and `high` quality. Use an API Key from the group associated with that model's provider: `gpt-image-2` is OpenAI/GPT, while `gemini-3.1-flash-image` is Google/Gemini and commonly uses `2k` quality. Check `references/api.md` before choosing a model-specific size or quality.
 
 ```bash
 python3 "$SKILL_DIR/scripts/silicogrove_image.py" generate \
