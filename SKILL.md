@@ -11,27 +11,25 @@ The client creates an asynchronous task at `https://ai.silicogrove.com/v1/images
 
 ## Update check
 
-Before the first `generate` or `edit` of each calendar day, check this Skill's Git remote for updates. Store the last successful check date in `${XDG_CONFIG_HOME:-$HOME/.config}/silicogrove-image/update-check-date`; when it already contains today's local date, skip the remote check and continue silently. When `origin/main` is ahead, briefly tell the user that a Skill update was found because it may contain required bug fixes or compatibility changes. When the working tree is clean, fast-forward to it and use the updated Skill before making an image request. If local modifications prevent the update, do not make the image request: tell the user once that the update is blocked and local changes must be resolved first. Do not overwrite local changes. If the Skill is not a Git checkout, has no `origin`, or the check or update fails, warn briefly before the image request that update status could not be verified and do not make the request. A normal up-to-date check must remain silent.
+Before the first `generate` or `edit` of each calendar day, check this Skill's Git remote for updates. Store the check date in `${XDG_CONFIG_HOME:-$HOME/.config}/silicogrove-image/update-check-date`; when it already contains today's local date, skip the remote check and continue silently. When `origin/main` is ahead, briefly tell the user that a Skill update was found because it may contain required bug fixes or compatibility changes. When the working tree is clean, fast-forward to it and use the updated Skill before making an image request. Never require an update: if local modifications block it, or the Skill is not a Git checkout, has no `origin`, or checking or updating fails, briefly say so and continue the image request using the current local version. Do not overwrite local changes. A normal up-to-date check must remain silent.
 
 ```bash
 UPDATE_STAMP="${XDG_CONFIG_HOME:-$HOME/.config}/silicogrove-image/update-check-date"
 TODAY="$(date +%Y-%m-%d)"
 if [ ! -r "$UPDATE_STAMP" ] || [ "$(cat "$UPDATE_STAMP" 2>/dev/null)" != "$TODAY" ]; then
   if ! git -C "$SKILL_DIR" remote get-url origin >/dev/null 2>&1; then
-    echo "Silico Grove Image Skill update check unavailable; image request not started." >&2
-    exit 1
-  fi
-  if ! git -C "$SKILL_DIR" fetch --quiet origin; then
-    echo "Silico Grove Image Skill update check failed; image request not started." >&2
-    exit 1
-  fi
-  if [ "$(git -C "$SKILL_DIR" rev-list --count HEAD..origin/main)" -gt 0 ]; then
+    echo "Silico Grove Image Skill update check unavailable; using the installed version." >&2
+  elif ! git -C "$SKILL_DIR" fetch --quiet origin; then
+    echo "Silico Grove Image Skill update check failed; using the installed version." >&2
+  elif [ "$(git -C "$SKILL_DIR" rev-list --count HEAD..origin/main)" -gt 0 ]; then
     if [ -n "$(git -C "$SKILL_DIR" status --porcelain)" ]; then
-      echo "Silico Grove Image Skill update is blocked by local changes; image request not started." >&2
-      exit 1
+      echo "Silico Grove Image Skill update is blocked by local changes; using the installed version." >&2
+    else
+      echo "Silico Grove Image Skill update found; applying it before the image request." >&2
+      if ! git -C "$SKILL_DIR" pull --ff-only origin main; then
+        echo "Silico Grove Image Skill update failed; using the installed version." >&2
+      fi
     fi
-    echo "Silico Grove Image Skill update found; applying it before the image request." >&2
-    git -C "$SKILL_DIR" pull --ff-only origin main || exit 1
   fi
   mkdir -p "$(dirname "$UPDATE_STAMP")"
   printf '%s\n' "$TODAY" > "$UPDATE_STAMP"
