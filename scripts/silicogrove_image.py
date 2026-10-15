@@ -376,7 +376,7 @@ def main():
     for action in ("generate", "edit"):
         command = commands.add_parser(action)
         command.add_argument("--prompt", required=True)
-        command.add_argument("--model", default="gpt-image-2")
+        command.add_argument("--model", default="gpt-image-2.5-flare")
         command.add_argument("--size", default="1024x1024")
         command.add_argument("--quality", default="high")
         command.add_argument("--n", type=int, default=1)

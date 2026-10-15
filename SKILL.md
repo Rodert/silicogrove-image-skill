@@ -39,7 +39,7 @@ fi
 ## Credential workflow
 
 1. Run `python3 "$SKILL_DIR/scripts/silicogrove_image.py" config --show-status` only on first use or when changing the selected model/provider; reuse the saved key for normal requests.
-2. If it prints `not configured`, ask for a key from the API Key group associated with the selected model's provider. `gpt-image-2` is an OpenAI/GPT model; `gemini-3.1-flash-image` is a Google/Gemini model. Do not assume a key issued for one provider's models can invoke another provider's models, and do not assume the console's group name follows a fixed naming convention.
+2. If it prints `not configured`, ask for a key from the API Key group associated with the selected model's provider. Both supported models are OpenAI/GPT models and require the corresponding provider group. Do not assume the console's group name follows a fixed naming convention.
 3. Keep the key out of prompts, project files, output, and terminal arguments.
 4. When the runtime supports interactive terminal input, run `config --set-key` and enter the key without echoing it.
 5. When an Agent can securely send an already-provided key through process standard input, use `config --set-key-stdin`. Do not put it in a command-line argument or environment variable.
@@ -48,12 +48,12 @@ The client stores the key in the current user's configuration directory: `~/.con
 
 ## Generate
 
-Use the saved model directly; do not query the model list before every request. Run `python3 "$SKILL_DIR/scripts/silicogrove_image.py" models` only during initial setup, when switching models, or when the selected model is rejected. Defaults are `gpt-image-2`, `1024x1024`, and `high` quality. Use an API Key from the group associated with that model's provider: `gpt-image-2` is OpenAI/GPT, while `gemini-3.1-flash-image` is Google/Gemini and commonly uses `2k` quality. Check `references/api.md` before choosing a model-specific size or quality.
+Use `gpt-image-2.5-flare` by default for ordinary generation and editing, including background replacement and style transfer. Use `gpt-image-2.5-sunburst` only when the user explicitly requests refinement, detail enhancement, further polishing, 2K/4K or other high-resolution output, commercial/print-ready output, or final delivery quality. Never select sunburst automatically for an ordinary request and never run a hidden second refinement task. After a successful flare result, you may briefly mention sunburst as an optional next step, but do not invoke it. Run `models` only during initial setup, when switching models, or when the selected model is rejected. Defaults are `gpt-image-2.5-flare`, `1024x1024`, and `high` quality. Check `references/api.md` before choosing a model-specific size or quality.
 
 ```bash
 python3 "$SKILL_DIR/scripts/silicogrove_image.py" generate \
   --prompt 'A cinematic product photograph of a compact espresso machine, soft studio light, light gray background' \
-  --model gpt-image-2 --size 1536x1024 --quality high --output-dir ./outputs
+  --model gpt-image-2.5-flare --size 1536x1024 --quality high --output-dir ./outputs
 ```
 
 Use `--n` only from 1 through 4. The client prints the result paths and PNG dimensions when available. Add `--no-wait` to print the task ID immediately, then resume later with `status TASK_ID --output-dir ./outputs`.
@@ -64,10 +64,10 @@ Use `--n` only from 1 through 4. The client prints the result paths and PNG dime
 python3 "$SKILL_DIR/scripts/silicogrove_image.py" edit \
   --image /absolute/path/to/source.png \
   --prompt 'Keep the product unchanged and replace the background with a clean white studio backdrop.' \
-  --model gpt-image-2 --size 1024x1024 --quality high --output-dir ./outputs
+  --model gpt-image-2.5-flare --size 1024x1024 --quality high --output-dir ./outputs
 ```
 
-The image must be PNG, JPG, JPEG, or WebP and must not exceed 10 MiB. The client submits a local reference image as `images: [{"image_url": "data:image/...;base64,..."}]` because the documented multipart task route may reject valid form fields. Use `gemini-3.1-flash-image` with `--quality 2k` for a Gemini image workflow when that model is available to the key. `--no-wait` and `status TASK_ID` work for asynchronous edits as well.
+The image must be PNG, JPG, JPEG, or WebP and must not exceed 10 MiB. The client submits a local reference image as `images: [{"image_url": "data:image/...;base64,..."}]` because the documented multipart task route may reject valid form fields. Use `--model gpt-image-2.5-sunburst` only when the user's request meets the explicit refinement or high-resolution rules above. `--no-wait` and `status TASK_ID` work for asynchronous edits as well.
 
 ## Error handling
 

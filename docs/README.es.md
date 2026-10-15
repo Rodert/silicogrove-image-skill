@@ -14,6 +14,8 @@ En el primer uso, pídeme de forma proactiva una Silico Grove API Key y guárdal
 
 Usa tareas de imagen asíncronas y descarga las imágenes terminadas en mi directorio local de salida, no solo enlaces de imágenes.
 
+Usa `gpt-image-2.5-flare` por defecto para la generación y edición normales. Usa `gpt-image-2.5-sunburst` solo si solicito explícitamente refinamiento, mejora de detalles, retoques adicionales, salida 2K/4K, calidad comercial/de impresión o calidad final de entrega; no ejecutes automáticamente una segunda generación de refinamiento.
+
 Antes de la primera solicitud generate o edit de cada día, comprueba las actualizaciones Git remotas de este Skill y omite la comprobación en las siguientes solicitudes del mismo día. Si no hay actualización, continúa sin avisarme. Si hay una actualización, avísame brevemente y actualiza una copia local limpia antes de hacer la solicitud de imagen. Si falla la comprobación o la actualización, o los cambios locales la bloquean, avísame brevemente y continúa con la versión instalada; no sobrescribas nunca los cambios locales.
 
 Usa una API Key del grupo correspondiente al proveedor del modelo seleccionado. No supongas que el nombre del grupo en la consola es fijo; confirma que el modelo está disponible para la Key guardada. Si la generación falla, indícame que verifique el grupo de Key del proveedor, el acceso al modelo y el saldo.
